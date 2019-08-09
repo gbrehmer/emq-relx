@@ -14,7 +14,7 @@
 :: * usage - display available commands
 
 :: Set variables that describe the release
-@set rel_name=emqttd
+@set rel_name=emqx
 @set rel_vsn={{ rel_vsn }}
 @set erts_vsn={{ erts_vsn }}
 @set erl_opts={{ erl_opts }}
@@ -32,7 +32,7 @@
 @set etc_dir=%rel_root_dir%\etc
 @set lib_dir=%rel_root_dir%\lib
 @set data_dir=%rel_root_dir%\data
-@set emq_conf=%etc_dir%\emq.conf
+@set emqx_conf=%etc_dir%\emqx.conf
 
 @call :find_erts_dir
 @call :find_vm_args
@@ -50,15 +50,15 @@
 @set erl_exe="%bindir%\erl.exe"
 @set nodetool="%rel_root_dir%\bin\nodetool"
 @set cuttlefish="%rel_root_dir%\bin\cuttlefish"
+@set node_type="-name"
 
-:: Extract node name from emq.conf
-@for /f "usebackq delims=\= tokens=2" %%I in (`findstr /b node\.name "%emq_conf%"`) do @(
-  @set node_type="-name"
+:: Extract node name from emqx.conf
+@for /f "usebackq delims=\= tokens=2" %%I in (`findstr /b node\.name "%emqx_conf%"`) do @(
   @call :set_trim node_name %%I
 )
 
-:: Extract node cookie from emq.conf
-@for /f "usebackq delims=\= tokens=2" %%I in (`findstr /b node\.cookie "%emq_conf%"`) do @(
+:: Extract node cookie from emqx.conf
+@for /f "usebackq delims=\= tokens=2" %%I in (`findstr /b node\.cookie "%emqx_conf%"`) do @(
   @call :set_trim node_cookie= %%I
 )
 
@@ -138,7 +138,7 @@
 @goto :eof
 
 :generate_app_config
-@set mergeconf_cmd=%escript% %nodetool% mergeconf %etc_dir%\emq.conf %etc_dir%\plugins %data_dir%\configs
+@set mergeconf_cmd=%escript% %nodetool% mergeconf %etc_dir%\emqx.conf %etc_dir%\plugins %data_dir%\configs
 @for /f %%Z in ('%%mergeconf_cmd%%') do @(
   set merged_app_conf=%%Z
 )
@@ -176,18 +176,21 @@
 :: Install the release as a Windows service
 :: or install the specified version passed as argument
 :install
+@call :create_mnesia_dir
+@call :generate_app_config
+:: Install the service
+@set args="-boot %boot_script% %sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'"
+@set description=EMQ node %node_name% in %rootdir%
 @if "" == "%2" (
-  :: Install the service
-  set args=%erl_opts% -setcookie %node_cookie% ++ -rootdir \"%rootdir%\"
-  set start_erl=%erts_dir%\bin\start_erl.exe
-  set description=EMQ-2.0 node %node_name% in %rootdir%
-  %erlsrv% add %service_name% %node_type% "%node_name%" -c "%description%" ^
-           -w "%rootdir%" -m "%start_erl%" -args "%args%" ^
-           -stopaction "init:stop()."
+  %erlsrv% add %service_name% %node_type% "%node_name%" -on restart -c "%description%" ^
+           -i "emqx" -w "%rootdir%" -m %erl_exe% -args %args% ^
+           -st "init:stop()."
+  sc config emqx start=delayed-auto
 ) else (
   :: relup and reldown
   goto relup
 )
+
 @goto :eof
 
 :: Uninstall the Windows service
@@ -202,7 +205,7 @@
 :: @%erlsrv% start %service_name%
 @call :create_mnesia_dir
 @call :generate_app_config
-@set args=-detached %sys_config% %args_file% %generated_config_args% -mnesia dir '%mnesia_dir%'
+@set args=-detached %sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
 @echo off
 cd /d %rel_root_dir%
 @echo on
@@ -232,11 +235,12 @@ cd /d %rel_root_dir%
 :console
 @call :create_mnesia_dir
 @call :generate_app_config
-@set args=%sys_config% %args_file% %generated_config_args% -mnesia dir '%mnesia_dir%'
+@set args=%sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
 @echo off
 cd /d %rel_root_dir%
 @echo on
 @start "bin\%rel_name% console" %werl% -boot "%boot_script%" %args%
+@echo emqx is started!
 @goto :eof
 
 :: Ping the running node

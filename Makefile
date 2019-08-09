@@ -1,71 +1,97 @@
-PROJECT = emq-relx
-PROJECT_DESCRIPTION = Release Project for the EMQ Broker
-PROJECT_VERSION = 2.3.10-authfix3
+## shallow clone for speed
 
-## Fix 'rebar command not found'
-DEPS = goldrush
-dep_goldrush = git https://github.com/basho/goldrush 0.1.9
+REBAR_GIT_CLONE_OPTIONS += --depth 1
+export REBAR_GIT_CLONE_OPTIONS
 
-DEPS += emqttd emq_modules emq_dashboard emq_retainer emq_recon emq_reloader \
-        emq_auth_clientid emq_auth_username emq_auth_ldap emq_auth_http \
-        emq_auth_mysql emq_auth_pgsql emq_auth_redis emq_auth_mongo \
-        emq_sn emq_coap emq_stomp emq_plugin_template emq_web_hook \
-        emq_lua_hook emq_auth_jwt
+TAG = $(shell git tag -l --points-at HEAD)
 
-# emq deps
-dep_emqttd        = git https://github.com/gbrehmer/emqttd master
-dep_emq_modules   = git https://github.com/emqtt/emq-modules master
-dep_emq_dashboard = git https://github.com/emqtt/emq-dashboard master
-dep_emq_retainer  = git https://github.com/emqtt/emq-retainer master
-dep_emq_recon     = git https://github.com/emqtt/emq-recon master
-dep_emq_reloader  = git https://github.com/emqtt/emq-reloader master
+CUR_BRANCH := $(shell git branch | grep -e "^*" | cut -d' ' -f 2)
 
-# emq auth/acl plugins
-dep_emq_auth_clientid = git https://github.com/emqtt/emq-auth-clientid master
-dep_emq_auth_username = git https://github.com/emqtt/emq-auth-username master
-dep_emq_auth_ldap     = git https://github.com/emqtt/emq-auth-ldap master
-dep_emq_auth_http     = git https://github.com/emqtt/emq-auth-http master
-dep_emq_auth_mysql    = git https://github.com/emqtt/emq-auth-mysql master
-dep_emq_auth_pgsql    = git https://github.com/emqtt/emq-auth-pgsql master
-dep_emq_auth_redis    = git https://github.com/emqtt/emq-auth-redis master
-dep_emq_auth_mongo    = git https://github.com/emqtt/emq-auth-mongo master
-dep_emq_auth_jwt      = git https://github.com/emqtt/emq-auth-jwt master
+ifeq ($(EMQX_DEPS_DEFAULT_VSN),)
+	ifneq ($(TAG),)
+		EMQX_DEPS_DEFAULT_VSN ?= $(lastword 1, $(TAG))
+	else
+		EMQX_DEPS_DEFAULT_VSN ?= $(CUR_BRANCH)
+	endif
+endif
 
-# mqtt-sn, coap and stomp
-dep_emq_sn    = git https://github.com/emqtt/emq-sn master
-dep_emq_coap  = git https://github.com/emqtt/emq-coap master
-dep_emq_stomp = git https://github.com/emqtt/emq-stomp master
+REBAR = $(CURDIR)/rebar3
 
-# plugin template
-dep_emq_plugin_template = git https://github.com/emqtt/emq-plugin-template master
+REBAR_URL = https://s3.amazonaws.com/rebar3/rebar3
 
-# web_hook lua_hook
-dep_emq_web_hook  = git https://github.com/emqtt/emq-web-hook master
-dep_emq_lua_hook  = git https://github.com/emqtt/emq-lua-hook master
-#dep_emq_elixir_plugin = git  https://github.com/emqtt/emq-elixir-plugin master
+export EMQX_DEPS_DEFAULT_VSN
 
-# COVER = true
+PROFILE ?= emqx
+PROFILES := emqx emqx_pkg emqx_edge emqx_edge_pkg
 
-#NO_AUTOPATCH = emq_elixir_plugin
+CT_APPS := emqx_auth_jwt emqx_auth_mysql emqx_auth_username \
+		emqx_delayed_publish emqx_management emqx_recon emqx_rule_enginex \
+		emqx_stomp emqx_auth_clientid  emqx_auth_ldap   emqx_auth_pgsql \
+		emqx_coap emqx_lua_hook emqx_passwd emqx_reloader emqx_sn \
+		emqx_web_hook emqx_auth_http emqx_auth_mongo emqx_auth_redis \
+		emqx_dashboard emqx_lwm2m emqx_psk_file emqx_retainer emqx_statsd
 
-include erlang.mk
+.PHONY: default
+default: $(REBAR) $(PROFILE)
 
-plugins:
-	@rm -rf rel
-	@mkdir -p rel/conf/plugins/ rel/schema/
-	@for conf in $(DEPS_DIR)/*/etc/*.conf* ; do \
-		if [ "emq.conf" = "$${conf##*/}" ] ; then \
-			cp $${conf} rel/conf/ ; \
-		elif [ "acl.conf" = "$${conf##*/}" ] ; then \
-			cp $${conf} rel/conf/ ; \
-		elif [ "ssl_dist.conf" = "$${conf##*/}" ] ; then \
-			cp $${conf} rel/conf/ ; \
-		else \
-			cp $${conf} rel/conf/plugins ; \
-		fi ; \
-	done
-	@for schema in $(DEPS_DIR)/*/priv/*.schema ; do \
-		cp $${schema} rel/schema/ ; \
-	done
+.PHONY: all
+all: $(REBAR) $(PROFILES)
 
-app:: plugins
+.PHONY: distclean
+distclean:
+	@rm -rf _build
+	@rm -f data/app.*.config data/vm.*.args rebar.lock
+	@rm -rf _checkouts
+
+.PHONY: $(PROFILES)
+$(PROFILES:%=%): $(REBAR)
+ifneq ($(OS),Windows_NT)
+	ln -snf _build/$(@)/lib ./_checkouts
+endif
+	$(REBAR) as $(@) release
+
+.PHONY: $(PROFILES:%=build-%)
+$(PROFILES:%=build-%): $(REBAR)
+	$(REBAR) as $(@:build-%=%) compile
+
+.PHONY: deps-all
+deps-all: $(REBAR) $(PROFILES:%=deps-%)
+
+.PHONY: $(PROFILES:%=deps-%)
+$(PROFILES:%=deps-%): $(REBAR)
+	$(REBAR) as $(@:deps-%=%) get-deps
+
+.PHONY: run $(PROFILES:%=run-%)
+run: run-$(PROFILE)
+$(PROFILES:%=run-%): $(REBAR)
+ifneq ($(OS),Windows_NT)
+	@ln -snf _build/$(@:run-%=%)/lib ./_checkouts
+endif
+	$(REBAR) as $(@:run-%=%) run
+
+.PHONY: clean $(PROFILES:%=clean-%)
+clean: $(PROFILES:%=clean-%)
+$(PROFILES:%=clean-%): $(REBAR)
+	@rm -rf _build/$(@:clean-%=%)
+	@rm -rf _build/$(@:clean-%=%)+test
+
+.PHONY: $(PROFILES:%=checkout-%)
+$(PROFILES:%=checkout-%): $(REBAR) build-$(PROFILE)
+	ln -s -f _build/$(@:checkout-%=%)/lib ./_checkouts
+
+# Checkout current profile
+.PHONY: checkout
+checkout:
+	@ln -s -f _build/$(PROFILE)/lib ./_checkouts
+
+# Run ct for an app in current profile
+.PHONY: $(REBAR) $(CT_APPS:%=ct-%)
+ct: $(CT_APPS:%=ct-%)
+$(CT_APPS:%=ct-%): checkout-$(PROFILE)
+	$(REBAR) as $(PROFILE) ct --verbose --dir _checkouts/$(@:ct-%=%)/test --verbosity 50
+
+$(REBAR):
+ifneq ($(wildcard rebar3),rebar3)
+	@curl -Lo rebar3 $(REBAR_URL) || wget $(REBAR_URL)
+endif
+	@chmod a+x rebar3

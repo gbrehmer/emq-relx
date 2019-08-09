@@ -1,48 +1,74 @@
-emq-relx
-========
+# emqx-rel
 
-The Release Project for the *EMQ* Broker.
 
-NOTICE: Requires Erlang/OTP R19.3+ to build since EMQ 2.2-rc.2.
+The Release Project for EMQ X Broker.
 
-Build on Linux/Unix/Mac
------------------------
+NOTICE: Requires Erlang/OTP R21.0+ to build since EMQ X R3.2
 
-```
-git clone https://github.com/emqtt/emq-relx.git
-cd emq-relx && make
-cd _rel/emqttd && ./bin/emqttd console
-```
 
-Build Docker Image
-------------------
+There are 4 target profiles for building emqx-rel: emqx, emqx_pkg, emqx_edge,and emqx_edge_pkg. The default target profile is emqx. User can build specified target release by execute command `make ${target-release}` in emqx_rel.
+
+## Install Erlang/OTP-R21.3 and rebar3
+
+Read the section below and install rebar3
 
 ```
-git clone https://github.com/emqtt/emq_docker.git
-cd emq_docker && docker build -t emq:latest .
+https://www.rebar3.org/docs/getting-started#section-installing-from-source
 ```
 
-Build on Windows
-----------------
-
-Install Erlang/OTP-R18.3 and MSYS2-x86_64 for erlang.mk:
+## Build on Linux/Unix/Mac
 
 ```
-https://erlang.mk/guide/installation.html#_on_windows
+git clone https://github.com/emqx/emqx-rel.git emqx-rel
+cd emqx-rel && make
+./_build/emqx/rel/emqx/bin/emqx console
 ```
 
-Clone and build the EMQ broker with erlang.mk:
+## Build on Windows
 
 ```
-git clone https://github.com/emqtt/emq-relx.git
-cd emq-relx
+git clone https://github.com/emqx/emqx-rel.git emqx-rel
+cd emqx-rel
 make
-cd _rel\emqttd
-bin\emqttd console
+cd _build\emqx\rel\emqx
+bin\emqx console
 ```
 
-License
--------
+## Build with elixir plugins
+
+Modify the rebar.config.
+
+```erlang
+
+{elixir_deps,
+   [ {plugin_name, {git, "url_of_plugin", {tag, "tag_of_plugin"}}}
+   , ....
+   ....
+   ]
+}
+
+......
+......
+
+{elixir_relx_apps,
+    [ app_name1
+    , app_name2]}.
+
+```
+
+Due to the limit of the `rebar3_elixir_compile`, users have to specify all the
+dependencies of the the elixir plugin in rebar.config in emqx-rel.
+
+# Test
+
+```bash
+make ct
+```
+
+# License
 
 Apache License Version 2.0
 
+# Author
+
+EMQ X Team.

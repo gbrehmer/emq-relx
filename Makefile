@@ -23,7 +23,7 @@ dep_emq_reloader  = git https://github.com/emqtt/emq-reloader v2.3.10
 # emq auth/acl plugins
 dep_emq_auth_clientid = git https://github.com/emqtt/emq-auth-clientid v2.3.10
 dep_emq_auth_username = git https://github.com/emqtt/emq-auth-username v2.3.10
-dep_emq_auth_ldap     = git https://github.com/emqtt/emq-auth-ldap v2.3.10
+dep_emq_auth_ldap     = git https://github.com/gbrehmer/emq-auth-ldap v2.3.10
 dep_emq_auth_http     = git https://github.com/emqtt/emq-auth-http v2.3.10
 dep_emq_auth_mysql    = git https://github.com/emqtt/emq-auth-mysql v2.3.10
 dep_emq_auth_pgsql    = git https://github.com/emqtt/emq-auth-pgsql v2.3.10

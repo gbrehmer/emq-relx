@@ -1,6 +1,6 @@
 PROJECT = emq-relx
 PROJECT_DESCRIPTION = Release Project for the EMQ Broker
-PROJECT_VERSION = 2.3.10-authfix4
+PROJECT_VERSION = 2.3.10-authfix5
 
 ## Fix 'rebar command not found'
 DEPS = goldrush
@@ -13,7 +13,7 @@ DEPS += emqttd emq_modules emq_dashboard emq_retainer emq_recon emq_reloader \
         emq_lua_hook emq_auth_jwt
 
 # emq deps
-dep_emqttd        = git https://github.com/gbrehmer/emqttd v2.3.10-authfix4
+dep_emqttd        = git https://github.com/gbrehmer/emqttd v2.3.10-authfix5
 dep_emq_modules   = git https://github.com/emqtt/emq-modules v2.3.10
 dep_emq_dashboard = git https://github.com/emqtt/emq-dashboard v2.3.10
 dep_emq_retainer  = git https://github.com/emqtt/emq-retainer v2.3.10
